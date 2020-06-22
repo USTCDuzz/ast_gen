@@ -1,5 +1,5 @@
 package bstruct
 
 type B struct {
-	Ee []byte `fixType:"4"`
+	Ee []byte `fixType:"var 4"`
 }

@@ -6,7 +6,6 @@ import (
 	"go/ast"
 	"go/format"
 	"go/parser"
-	"go/printer"
 	"go/token"
 	"log"
 	"os"
@@ -30,58 +29,95 @@ const (
 )
 
 func FmtColor(format string, clr int) string {
-	/*if HtmlPrint {
-		var clrs = "black"
-		switch clr {
-		case testRed:
-			clrs = "red"
-		case testGreen:
-			clrs = "green"
-		case testBlue:
-			clrs = "blue"
-		case testPurple:
-			clrs = "purple"
-		}
-		return fmt.Sprintf(`<font color="%s">%s</font>`, clrs, format)
-	} else {*/
 	return fmt.Sprintf("%c[%d;%d;%dm%s%c[0m", 0x1B, conf, bg, clr, format, 0x1B)
-	// }
 }
 
 type FindContext struct {
 	/*File      string
 	Package   string
 	LocalFunc *ast.FuncDecl*/
+	structName string
 }
 
 var GFset *token.FileSet // 全局存储token的position
 
 func fixTypeInTag(string2 string) string {
-	string2 = strings.TrimLeft(string2,`"`)
-	string2 = strings.TrimRight(string2,`"`)
-	return string2
+	split := strings.Split(string2, `"`)
+	if len(split) > 1 {
+		return split[1]
+	}
+	return ""
 }
 
 func (f *FindContext) Visit(n ast.Node) ast.Visitor {
 	if n == nil {
 		return f
 	}
-	// Find Tag With FixType Statements
-	ret, ok := n.(*ast.Field)
-	if ok && ret != nil && ret.Tag != nil {
-		if strings.Contains(ret.Tag.Value, "fixType") && strings.Contains(ret.Tag.Value, "optional") {
-			fmt.Printf("变长字段 on line %v:\n", GFset.Position(ret.Pos()))
-			fmt.Printf("tag %+v found on line %v:\n", FmtColor(fixTypeInTag(ret.Tag.Value), testRed), GFset.Position(ret.Tag.Pos()))
-			_ = printer.Fprint(os.Stdout, GFset, ret)
-			_ = printer.Fprint(os.Stdout, GFset, ret.Tag)
-			fmt.Printf("\n")
-			ast.Print(GFset, ret)
 
-			if arryDef, ok := ret.Type.(*ast.ArrayType); ok {
-				ret.Type = f.arrayToOptional(arryDef)
+	switch ele := n.(type) {
+	case *ast.Field:
+		if ele == nil || ele.Tag == nil || !strings.Contains(ele.Tag.Value, "fixType") {
+			// tag中不包含fixType的
+			break
+		}
+		fixValue := fixTypeInTag(ele.Tag.Value)
+		fmt.Println(fixValue)
+		fmt.Printf("变长字段 on line %v:\n", GFset.Position(ele.Pos()))
+		ast.Print(GFset, ele)
+
+		// feildName := ele.Names[0].Name // 不重要
+		// optional struct
+		// var struct
+		// var []byte
+		// var string
+		switch typeInfo := ele.Type.(type) {
+		case *ast.Ident: // 单个
+			if typeInfo.Name == "string" {
+				// string ---> [XLen]byte
 			}
+		case *ast.ArrayType: // array
+			// []xxx
+			switch arrEle := typeInfo.Elt.(type) {
+			case *ast.SelectorExpr:
+				// []xxx.xxx 外部包
+			case *ast.Ident:
+				// 内部
+				switch arrEle.Name {
+				case "byte":
+					// []byte
+				default:
+					// []others
+				}
+			default:
+				log.Printf("%T not accept", arrEle)
+			}
+		default:
+			log.Printf("%T not accept", typeInfo)
+		}
+	case *ast.StructType:
+	// structName
+	// ast.Print(GFset, ele)
+	case *ast.Ident:
+		fmt.Printf("*ast.Ident on line %v:\n", GFset.Position(ele.Pos()))
+		if ele.Name == "A"{
+			ast.Print(GFset, ele)
 		}
 	}
+	//ret, ok := n.(*ast.Field)
+	//if ok && ret != nil && ret.Tag != nil {
+	//	if strings.Contains(ret.Tag.Value, "fixType") && strings.Contains(ret.Tag.Value, "optional") {
+	//		fmt.Printf("变长字段 on line %v:\n", GFset.Position(ret.Pos()))
+	//		fmt.Printf("tag %+v found on line %v:\n", FmtColor(fixTypeInTag(ret.Tag.Value), testRed), GFset.Position(ret.Tag.Pos()))
+	//		_ = printer.Fprint(os.Stdout, GFset, ret)
+	//		_ = printer.Fprint(os.Stdout, GFset, ret.Tag)
+	//		fmt.Printf("\n")
+	//		ast.Print(GFset, ret)
+	//
+	//		//if arryDef, ok := ret.Type.(*ast.ArrayType); ok {
+	//		//	ret.Type = f.arrayToOptional(arryDef)
+	//		//}
+	//	}
+	//}
 
 	return f
 }
@@ -144,10 +180,10 @@ func Test_Parse(t *testing.T) {
 
 			ast.Walk(fix, f)
 
-			var buf bytes.Buffer
+			/*var buf bytes.Buffer
 			printer.Fprint(&buf, fsetInner, f)
 
-			genFile(fname, buf)
+			genFile(fname, buf)*/
 		}
 	}
 

@@ -50,3 +50,12 @@ func Test_Parse(t *testing.T) {
 
 	ast.Print(fset, dir)
 }
+
+func Test_PrintStringGen(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, `D:\gopath\src\gogen\astruct\ss_string_gen.go`, nil, parser.ParseComments)
+	if err != nil {
+		fmt.Println(err)
+	}
+	ast.Print(fset, file)
+}
